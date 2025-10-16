@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 文件管理器</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; }
+        nav { background-color: #333; padding: 10px; }
+        nav a { color: white; text-decoration: none; padding: 10px; }
+        nav a:hover { background-color: #555; }
+        #container { display: flex; height: calc(100vh - 40px); }
+        #file-browser { width: 30%; border-right: 1px solid #ccc; padding: 10px; overflow-y: auto; }
+        #file-viewer { width: 70%; padding: 10px; display: flex; flex-direction: column; }
+        #file-content { flex-grow: 1; border: 1px solid #ccc; padding: 5px; white-space: pre-wrap; }
+        .file-item { cursor: pointer; }
+        .file-item:hover { background-color: #eee; }
+    </style>
+</head>
+<body>
+    {% include 'nav.html' %}
+    <div id="container">
+        <div id="file-browser">
+            <h2>文件浏览器</h2>
+            <div id="file-list"></div>
+        </div>
+        <div id="file-viewer">
+            <h2>文件查看器</h2>
+            <input type="text" id="file-path" placeholder="文件路径" style="width: 100%; margin-bottom: 10px;">
+            <textarea id="file-content" rows="20"></textarea>
+            <div style="margin-top: 10px;">
+                <button onclick="createFile()">新建文件</button>
+                <button onclick="saveFile()">保存文件</button>
+                <button onclick="deleteFile()">删除文件</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileList = document.getElementById('file-list');
+        const filePathInput = document.getElementById('file-path');
+        const fileContentTextarea = document.getElementById('file-content');
+
+        async function fetchFiles(path = '') {
+            const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+            const data = await response.json();
+            fileList.innerHTML = '';
+            if (path) {
+                const parentDiv = document.createElement('div');
+                parentDiv.textContent = '..';
+                parentDiv.className = 'file-item';
+                parentDiv.onclick = () => fetchFiles(path.substring(0, path.lastIndexOf('/')));
+                fileList.appendChild(parentDiv);
+            }
+            for (const file of data.files) {
+                const div = document.createElement('div');
+                div.textContent = file.name + (file.isDirectory ? '/' : '');
+                div.className = 'file-item';
+                div.onclick = () => {
+                    if (file.isDirectory) {
+                        fetchFiles(file.path);
+                    } else {
+                        viewFile(file.path);
+                    }
+                };
+                fileList.appendChild(div);
+            }
+        }
+
+        async function viewFile(path) {
+            const response = await fetch(`/api/files/${encodeURIComponent(path)}`);
+            const data = await response.json();
+            filePathInput.value = path;
+            fileContentTextarea.value = data.content;
+        }
+
+        async function createFile() {
+            const path = prompt("请输入新文件路径:");
+            if (path) {
+                await fetch(`/api/files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, content: '' })
+                });
+                fetchFiles();
+            }
+        }
+
+        async function saveFile() {
+            const path = filePathInput.value;
+            const content = fileContentTextarea.value;
+            await fetch(`/api/files`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, content })
+            });
+            alert('文件已保存!');
+        }
+
+        async function deleteFile() {
+            const path = filePathInput.value;
+            if (confirm(`您确定要删除 ${path} 吗?`)) {
+                await fetch(`/api/files/${encodeURIComponent(path)}`, { method: 'DELETE' });
+                filePathInput.value = '';
+                fileContentTextarea.value = '';
+                fetchFiles();
+            }
+        }
+
+        fetchFiles();
+    </script>
+</body>
+</html>

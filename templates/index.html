@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>MCP 服务器主页</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; margin: 0; }
+        h1, h2 { color: #333; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .sitemap a { display: block; margin: 10px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    {% include 'nav.html' %}
+    <div class="container">
+        <h1>欢迎来到 MCP 服务器</h1>
+        <p>这是一个多功能代码平台，提供文件管理、状态监控等功能。请使用上方的导航栏或下面的站点地图来访问不同的功能区。</p>
+
+        <h2>站点地图</h2>
+        <div class="sitemap">
+            <a href="/files">文件浏览器</a>
+            <a href="/monitor">服务器状态监控</a>
+        </div>
+    </div>
+</body>
+</html>

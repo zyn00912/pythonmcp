@@ -1,0 +1,25 @@
+[project]
+name = "mcp-server"
+version = "0.1.0"
+description = "A remote file/command execution server with a web monitoring interface."
+authors = [
+    {name = "Your Name", email = "you@example.com"},
+]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pygls",
+    "mysql-connector-python",
+    "python-dotenv",
+    "requests"
+]
+requires-python = ">=3.8"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest"
+]
