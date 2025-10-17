@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse
 # 创建一个 LanguageServer 实例，用于处理 MCP 请求
 server = LanguageServer("mcp-server", "v0.1")
 # 定义基础路径
-BASE_PATH = os.path.abspath('D:/WWWROOT/GSW/file')
+BASE_PATH = os.path.abspath('d:/gswfile')
 # 初始化 MCP 状态信息
 mcp_status = {
     "status": "运行中",
