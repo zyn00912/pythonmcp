@@ -7,8 +7,8 @@
     {% include 'nav.html' %}
     <h1>MCP 服务器状态</h1>
     <p>状态: {{ status.status }}</p>
-    <p>启动时间: {{ status.start_time }}</p>
-    <p>已处理请求: {{ status.requests_processed }}</p>
-    <p>上次请求时间: {{ status.last_request_time }}</p>
+    <p>启动时间: {{ status.server_start_time }}</p>
+    <p>已处理请求: {{ status.requests_received }}</p>
+    <p>上次请求: {{ status.last_request }}</p>
 </body>
 </html>

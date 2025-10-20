@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pygls
+mysql-connector-python
+python-dotenv
+requests
+jinja2
+fastmcp

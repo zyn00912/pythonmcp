@@ -6,20 +6,35 @@
     <style>
         body { font-family: sans-serif; line-height: 1.6; padding: 20px; margin: 0; }
         h1, h2 { color: #333; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .sitemap a { display: block; margin: 10px 0; font-size: 1.2em; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .sitemap a { display: block; margin: 10px 0; font-size: 1.1em; }
+        .card { border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-top: 16px; }
+        code, kbd { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
     </style>
 </head>
 <body>
     {% include 'nav.html' %}
     <div class="container">
         <h1>欢迎来到 MCP 服务器</h1>
-        <p>这是一个多功能代码平台，提供文件管理、状态监控等功能。请使用上方的导航栏或下面的站点地图来访问不同的功能区。</p>
+        <p>这是一个多功能代码平台，提供文件管理、状态监控与 MCP 服务等功能。请使用上方的导航栏或下面的站点地图来访问不同的功能区。</p>
 
         <h2>站点地图</h2>
         <div class="sitemap">
             <a href="/files">文件浏览器</a>
             <a href="/monitor">服务器状态监控</a>
+            <a href="/mcp">MCP 服务介绍</a>
+        </div>
+
+        <div class="card">
+            <h2>已启动的 MCP 服务</h2>
+            <p><strong>名称：</strong>{{ mcp.name }}</p>
+            <p><strong>URL：</strong><a href="{{ mcp.url }}" target="_blank">{{ mcp.url }}</a></p>
+            <p><strong>功能（工具）：</strong></p>
+            <ul>
+                {% for t in mcp.tools %}
+                <li><code>{{ t }}</code></li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
 </body>

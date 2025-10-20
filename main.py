@@ -160,12 +160,12 @@ async def list_files_handler(params: Dict[str, Any]) -> Dict[str, Any]:
             continue
 
         for d in dirs:
-            files.append({"name": d, "path": os.path.join(root, d).replace(BASE_PATH, ''), "isDirectory": True, "size": 0})
+            files.append({"name": d, "path": os.path.relpath(os.path.join(root, d), BASE_PATH), "isDirectory": True, "size": 0})
         for f in file_names:
             file_path = os.path.join(root, f)
             size = os.path.getsize(file_path)
             total_size += size
-            files.append({"name": f, "path": file_path.replace(BASE_PATH, ''), "isDirectory": False, "size": size})
+            files.append({"name": f, "path": os.path.relpath(file_path, BASE_PATH), "isDirectory": False, "size": size})
         
         if not recursive:
             dirs.clear()
@@ -284,7 +284,12 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
     """处理根路径的 GET 请求，返回主页。"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    mcp = {
+        "name": "MCP 文件服务",
+        "url": "http://127.0.0.1:8000/mcp",
+        "tools": ["list_files", "read_file", "write_file", "delete_path", "run_command"],
+    }
+    return templates.TemplateResponse("index.html", {"request": request, "mcp": mcp})
 
 @app.get("/files", response_class=HTMLResponse)
 async def read_files(request: Request):
@@ -294,7 +299,22 @@ async def read_files(request: Request):
 @app.get("/api/files")
 async def api_list_files(path: str = '.'):
     """处理 /api/files 的 GET 请求，列出文件。"""
-    return await list_files_handler({'path': path, 'recursive': False, 'maxDepth': 1})
+    return await list_files_handler({'path': path, 'recursive': True, 'maxDepth': 100})
+
+@app.get("/api/files/raw/{path:path}")
+async def api_read_file_raw(path: str):
+    abs_path = os.path.abspath(os.path.join(BASE_PATH, path))
+    if not os.path.exists(abs_path) or not os.path.isfile(abs_path):
+        return Response(status_code=404, content="File not found")
+    ext = os.path.splitext(abs_path)[1].lower()
+    media_type = "application/octet-stream"
+    if ext == ".mp3":
+        media_type = "audio/mpeg"
+    try:
+        f = open(abs_path, 'rb')
+        return StreamingResponse(f, media_type=media_type)
+    except Exception as e:
+        return Response(status_code=500, content=str(e))
 
 @app.get("/api/files/{path:path}")
 async def api_read_file(path: str):
@@ -311,22 +331,21 @@ async def api_delete_file(path: str):
     """处理 /api/files/{path} 的 DELETE 请求，删除文件。"""
     return await delete_path_handler({'path': path})
 
-@app.post("/mcp")
-async def mcp_endpoint(request: Request):
-    """处理 /mcp 的 POST 请求，用于 MCP 通信。"""
-    data = await request.body()
-
-    async def event_generator():
-        response_data = await server.protocol.data_received(data)
-        if response_data:
-            yield f"data: {response_data.decode('utf-8')}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.get("/monitor", response_class=HTMLResponse)
 async def monitor(request: Request):
     """处理 /monitor 的 GET 请求，返回监控页面。"""
     return templates.TemplateResponse("monitor.html", {"request": request, "status": mcp_status})
+
+@app.get("/mcp", response_class=HTMLResponse)
+async def mcp_info(request: Request):
+    """MCP 服务介绍页面"""
+    mcp = {
+        "name": "MCP 文件服务",
+        "url": "http://127.0.0.1:8000/mcp",
+        "tools": ["list_files", "read_file", "write_file", "delete_path", "run_command"],
+    }
+    return templates.TemplateResponse("mcp.html", {"request": request, "mcp": mcp})
 
 @app.get("/mcp-status")
 def get_mcp_status():

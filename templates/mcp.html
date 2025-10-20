@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>MCP 服务介绍</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; margin: 0; }
+        h1, h2 { color: #333; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card { border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+        code, kbd { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
+        ul { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    {% include 'nav.html' %}
+    <div class="container">
+        <h1>MCP 服务介绍</h1>
+        <div class="card">
+            <h2>服务信息</h2>
+            <p><strong>名称：</strong>{{ mcp.name }}</p>
+            <p><strong>URL：</strong><a href="{{ mcp.url }}" target="_blank">{{ mcp.url }}</a></p>
+        </div>
+        <div class="card">
+            <h2>已暴露工具</h2>
+            <ul>
+                {% for t in mcp.tools %}
+                <li><code>{{ t }}</code></li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="card">
+            <h2>如何启动</h2>
+            <p>你可以选择以下方式启动 MCP 服务：</p>
+            <ul>
+                <li>使用 CLI：<kbd>fastmcp run mcp_server.py</kbd></li>
+                <li>直接运行脚本：<kbd>python mcp_server.py</kbd></li>
+            </ul>
+            <p>默认启动后可通过 <code>http://127.0.0.1:8000/mcp</code> 访问。</p>
+        </div>
+        <div class="card">
+            <h2>客户端集成示例</h2>
+            <p>在支持 MCP 的客户端（如 TRAE）中可以使用如下配置：</p>
+            <pre>{
+  "mcpServers": {
+    "file_mcp_server": {
+      "command": "mcp-proxy",
+      "args": ["http://127.0.0.1:8000/mcp"],
+      "description": "通过代理连接到 FastMCP 服务"
+    }
+  }
+}</pre>
+        </div>
+    </div>
+</body>
+</html>

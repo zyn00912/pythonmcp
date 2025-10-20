@@ -3,111 +3,300 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP 文件管理器</title>
+    <title>MCP 文件浏览器</title>
     <style>
         body { font-family: sans-serif; margin: 0; }
         nav { background-color: #333; padding: 10px; }
         nav a { color: white; text-decoration: none; padding: 10px; }
         nav a:hover { background-color: #555; }
         #container { display: flex; height: calc(100vh - 40px); }
-        #file-browser { width: 30%; border-right: 1px solid #ccc; padding: 10px; overflow-y: auto; }
-        #file-viewer { width: 70%; padding: 10px; display: flex; flex-direction: column; }
-        #file-content { flex-grow: 1; border: 1px solid #ccc; padding: 5px; white-space: pre-wrap; }
-        .file-item { cursor: pointer; }
-        .file-item:hover { background-color: #eee; }
+        #dir-tree { width: 30%; border-right: 1px solid #ccc; padding: 10px; overflow-y: auto; }
+        #content { width: 70%; padding: 10px; display: flex; flex-direction: column; }
+        #breadcrumb { font-size: 14px; color: #555; margin-bottom: 8px; }
+        #file-list { border: 1px solid #ccc; flex: 1; overflow-y: auto; }
+        #open-files { margin-top: 10px; border: 1px solid #ccc; padding: 8px; min-height: 200px; max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.open-file { border: 1px solid #ddd; border-radius: 6px; }
+.open-file-header { background: #f5f5f5; padding: 6px 8px; display:flex; justify-content: space-between; align-items:center; }
+.open-file-body { padding: 8px; white-space: pre-wrap; }
+.open-file audio { width: 100%; }
+.open-file .close { cursor: pointer; border: none; background: transparent; font-size: 16px; }
+        .dir-item, .file-item { cursor: pointer; padding: 2px 4px; }
+        .dir-item:hover, .file-item:hover { background-color: #eee; }
+        .indent { display: inline-block; width: 16px; }
+        .toggle { display: inline-block; width: 16px; text-align: center; color: #888; }
+        .name { margin-left: 4px; }
+        .empty { color: #888; padding: 8px; }
+        #file-list .grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 8px; }
+        .tile-item { border: 1px solid #ddd; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 110px; cursor: pointer; }
+        .tile-item:hover { background-color: #f7f7f7; }
+        .tile-icon { font-size: 28px; }
+        .tile-name { margin-top: 6px; font-size: 13px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
     </style>
 </head>
 <body>
     {% include 'nav.html' %}
     <div id="container">
-        <div id="file-browser">
-            <h2>文件浏览器</h2>
-            <div id="file-list"></div>
+        <div id="dir-tree">
+            <h2>目录</h2>
+            <div id="tree-root"></div>
         </div>
-        <div id="file-viewer">
-            <h2>文件查看器</h2>
-            <input type="text" id="file-path" placeholder="文件路径" style="width: 100%; margin-bottom: 10px;">
-            <textarea id="file-content" rows="20"></textarea>
-            <div style="margin-top: 10px;">
-                <button onclick="createFile()">新建文件</button>
-                <button onclick="saveFile()">保存文件</button>
-                <button onclick="deleteFile()">删除文件</button>
-            </div>
+        <div id="content">
+            <h2>文件</h2>
+            <h3 style="margin:6px 0;">位置</h3>
+            <div id="breadcrumb"></div>
+            <div id="file-list"></div>
+            <h3 style="margin:10px 0 6px;">打开的文件</h3>
+            <div id="open-files"></div>
         </div>
     </div>
 
     <script>
-        const fileList = document.getElementById('file-list');
-        const filePathInput = document.getElementById('file-path');
-        const fileContentTextarea = document.getElementById('file-content');
+        const treeRootEl = document.getElementById('tree-root');
+        const fileListEl = document.getElementById('file-list');
+        const breadcrumbEl = document.getElementById('breadcrumb');
+        const openFilesEl = document.getElementById('open-files');
 
-        async function fetchFiles(path = '') {
-            const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
-            const data = await response.json();
-            fileList.innerHTML = '';
-            if (path) {
-                const parentDiv = document.createElement('div');
-                parentDiv.textContent = '..';
-                parentDiv.className = 'file-item';
-                parentDiv.onclick = () => fetchFiles(path.substring(0, path.lastIndexOf('/')));
-                fileList.appendChild(parentDiv);
+        let opened = {};
+        async function openFile(path) {
+            const p = norm(path);
+            if (opened[p]) { opened[p].scrollIntoView({behavior:'smooth', block:'center'}); return; }
+            const item = document.createElement('div');
+            item.className = 'open-file';
+            item.dataset.path = p;
+            const header = document.createElement('div'); header.className = 'open-file-header';
+            const nameSpan = document.createElement('span'); nameSpan.textContent = p; // 显示完整路径
+            const closeBtn = document.createElement('button'); closeBtn.className = 'close'; closeBtn.textContent = '×'; closeBtn.title = '关闭';
+            closeBtn.onclick = () => { delete opened[p]; item.remove(); };
+            header.appendChild(nameSpan); header.appendChild(closeBtn);
+            const body = document.createElement('div'); body.className = 'open-file-body';
+            const lower = p.toLowerCase();
+            if (lower.endsWith('.mp3')) {
+                body.innerHTML = `<audio controls src="/api/files/raw/${encodeURIComponent(p)}"></audio>`;
+            } else {
+                const response = await fetch(`/api/files/${encodeURIComponent(p)}`);
+                const data = await response.json();
+                if (data && typeof data.content === 'string') { body.textContent = data.content; }
+                else { body.textContent = '无法读取文件内容'; }
             }
-            for (const file of data.files) {
-                const div = document.createElement('div');
-                div.textContent = file.name + (file.isDirectory ? '/' : '');
-                div.className = 'file-item';
-                div.onclick = () => {
-                    if (file.isDirectory) {
-                        fetchFiles(file.path);
-                    } else {
-                        viewFile(file.path);
-                    }
+            item.appendChild(header); item.appendChild(body);
+            openFilesEl.appendChild(item);
+            opened[p] = item;
+        }
+
+        let allFiles = [];
+        let nodes = {}; // path -> { path, name, children: Set<string>, files: Array, expanded: boolean }
+        let currentDirPath = '';
+
+function updateBreadcrumb(path, fileName) {
+    const n = norm(path);
+    const segs = n ? n.split('/') : [];
+    let html = '当前位置: ';
+    html += `<a href="#" onclick="selectDir(''); return false;">/</a>`;
+    let cumulative = '';
+    for (const s of segs) {
+        cumulative = cumulative ? `${cumulative}/${s}` : s;
+        html += ` / <a href="#" onclick="selectDir('${cumulative}'); return false;">${s}</a>`;
+    }
+    if (fileName) {
+        html += ` — 当前文件: <strong class="filename">${fileName}</strong>`;
+    }
+    breadcrumbEl.innerHTML = html;
+}
+
+        function norm(p) {
+            return String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        }
+        function dirname(p) {
+            const n = norm(p);
+            const i = n.lastIndexOf('/');
+            return i === -1 ? '' : n.slice(0, i);
+        }
+        function basename(p) {
+            const n = norm(p);
+            if (!n) return '/';
+            const parts = n.split('/');
+            return parts[parts.length - 1];
+        }
+        function ensureNode(path) {
+            const npath = norm(path);
+            if (!nodes[npath]) {
+                nodes[npath] = { path: npath, name: npath ? basename(npath) : '/', children: new Set(), files: [], expanded: npath === '' };
+            }
+            return nodes[npath];
+        }
+        function addDir(path) {
+            const node = ensureNode(path);
+            const parent = ensureNode(dirname(path));
+            parent.children.add(node.path);
+        }
+        function addFile(file) {
+            const p = norm(file.path || file.name);
+            const parentPath = dirname(p);
+            const parent = ensureNode(parentPath);
+            parent.files.push({ name: basename(p), path: p, size: file.size || 0 });
+        }
+        function buildTree() {
+            nodes = {};
+            ensureNode(''); // root
+            for (const f of allFiles) {
+                const p = norm(f.path || f.name);
+                if (f.isDirectory) addDir(p);
+            }
+            for (const f of allFiles) {
+                if (!f.isDirectory) addFile(f);
+            }
+        }
+        function renderTree() {
+            treeRootEl.innerHTML = '';
+            function renderNode(path, depth) {
+                const node = nodes[path];
+                if (!node) return;
+                const row = document.createElement('div');
+                row.className = 'dir-item';
+                row.dataset.path = path;
+                // indent
+                for (let i = 0; i < depth; i++) {
+                    const ind = document.createElement('span');
+                    ind.className = 'indent';
+                    row.appendChild(ind);
+                }
+                // toggle
+                const toggle = document.createElement('span');
+                toggle.className = 'toggle';
+                toggle.textContent = node.children.size > 0 ? (node.expanded ? '▼' : '▶') : '·';
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    node.expanded = !node.expanded;
+                    renderTree();
                 };
-                fileList.appendChild(div);
+                row.appendChild(toggle);
+                // name
+                const label = document.createElement('span');
+                label.className = 'name';
+                label.textContent = depth === 0 ? '/' : node.name;
+                row.appendChild(label);
+                // click to select dir
+                row.onclick = () => {
+                    selectDir(path);
+                };
+                treeRootEl.appendChild(row);
+                // children
+                if (node.expanded) {
+                    const kids = Array.from(node.children).sort();
+                    for (const k of kids) renderNode(k, depth + 1);
+                }
             }
+            renderNode('', 0);
         }
+        function selectDir(path) {
+            currentDirPath = path;
+            updateBreadcrumb(path, null);
+            if (!filePageByDir[path]) filePageByDir[path] = 1;
+            renderFilesForDir(path);
+        }
+        const FILES_PER_PAGE = 15;
+        let filePageByDir = {};
+        function getPage(path) { return filePageByDir[path] || 1; }
+        function setPage(path, p, totalPages) {
+            const np = Math.min(Math.max(1, p), Math.max(1, totalPages));
+            filePageByDir[path] = np;
+            renderFilesForDir(path);
+        }
+        function extOf(name) {
+            const i = (name || '').lastIndexOf('.');
+            return i >= 0 ? name.slice(i + 1).toLowerCase() : '';
+        }
+        function getIcon(record) {
+            if (record.kind === 'dir') return '📁'; // 目录专用，不与文件类型重复
+            const ext = extOf(record.name);
+            if (['mp3','wav','m4a','flac','ogg'].includes(ext)) return '🎵'; // 音频
+            if (['png','jpg','jpeg','gif','bmp','webp','svg'].includes(ext)) return '🖼️'; // 图片
+            if (['pdf'].includes(ext)) return '📕'; // PDF
+            if (['txt','log','ini','cfg','conf'].includes(ext)) return '📝'; // 文本
+            if (['md','markdown'].includes(ext)) return '📒'; // Markdown
+            if (['csv'].includes(ext)) return '📊'; // CSV
+            if (['doc','docx'].includes(ext)) return '📘'; // Word
+            if (['xls','xlsx'].includes(ext)) return '📈'; // Excel
+            if (['zip','rar','7z','tar','gz','tgz'].includes(ext)) return '🗜️'; // 压缩包
+            if (['py'].includes(ext)) return '🐍'; // Python
+            if (['js','ts','jsx','tsx'].includes(ext)) return '🧩'; // JS/TS
+            if (['json','yaml','yml','xml'].includes(ext)) return '🗂️'; // 结构化数据
+            if (['exe','dll','bin','msi'].includes(ext)) return '⚙️'; // 二进制/可执行
+            return '📃'; // 其他文件类型
+        }
+        function renderFilesForDir(path) {
+            fileListEl.innerHTML = '';
+            const node = nodes[path];
+            if (!node) return;
+            const children = Array.from(node.children).sort((a,b) => nodes[a].name.localeCompare(nodes[b].name));
+            const files = node.files.slice().sort((a,b) => a.name.localeCompare(b.name));
+            // combine directories and files into one record list (dirs first)
+            const records = [
+                ...children.map(p => ({ kind: 'dir', path: p, name: nodes[p].name })),
+                ...files.map(f => ({ kind: 'file', path: f.path, name: f.name }))
+            ];
+            const totalRecords = records.length;
+            const page = getPage(path);
+            const totalPages = Math.max(1, Math.ceil(totalRecords / FILES_PER_PAGE));
+            const start = (page - 1) * FILES_PER_PAGE;
+            const end = Math.min(start + FILES_PER_PAGE, totalRecords);
 
+            // toolbar with stats and pagination (for records: dirs + files)
+            const toolbar = document.createElement('div');
+            toolbar.style.display = 'flex';
+            toolbar.style.justifyContent = 'space-between';
+            toolbar.style.alignItems = 'center';
+            toolbar.style.padding = '6px 8px';
+            toolbar.style.borderBottom = '1px solid #eee';
+
+            const stats = document.createElement('div');
+            stats.textContent = `记录：共 ${totalRecords} 个 | 页 ${page}/${totalPages} | 显示 ${totalRecords ? (start+1) : 0}-${totalRecords ? end : 0}`;
+            toolbar.appendChild(stats);
+
+            const pager = document.createElement('div');
+            const prevBtn = document.createElement('button'); prevBtn.textContent = '上一页';
+            prevBtn.disabled = page <= 1; prevBtn.onclick = () => setPage(path, page - 1, totalPages);
+            const nextBtn = document.createElement('button'); nextBtn.textContent = '下一页';
+            nextBtn.disabled = page >= totalPages; nextBtn.onclick = () => setPage(path, page + 1, totalPages);
+            pager.appendChild(prevBtn); pager.appendChild(nextBtn);
+            toolbar.appendChild(pager);
+
+            fileListEl.appendChild(toolbar);
+
+            if (totalRecords === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'empty';
+                empty.textContent = '当前目录为空';
+                fileListEl.appendChild(empty);
+                return;
+            }
+            // render records with pagination in a 5-column grid
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+            const pageRecords = records.slice(start, end);
+            for (const r of pageRecords) {
+                const item = document.createElement('div');
+                item.className = 'tile-item';
+                const iconEl = document.createElement('div'); iconEl.className = 'tile-icon'; iconEl.textContent = getIcon(r);
+                const nameEl = document.createElement('div'); nameEl.className = 'tile-name'; nameEl.textContent = r.kind === 'dir' ? `${r.name}/` : r.name;
+                item.appendChild(iconEl); item.appendChild(nameEl);
+                item.onclick = r.kind === 'dir' ? (() => selectDir(r.path)) : (() => viewFile(r.path));
+                grid.appendChild(item);
+            }
+            fileListEl.appendChild(grid);
+        }
         async function viewFile(path) {
-            const response = await fetch(`/api/files/${encodeURIComponent(path)}`);
+            await openFile(path);
+        }
+        async function fetchAll() {
+            const response = await fetch(`/api/files`);
             const data = await response.json();
-            filePathInput.value = path;
-            fileContentTextarea.value = data.content;
+            allFiles = Array.isArray(data.files) ? data.files : [];
+            buildTree();
+            renderTree();
+            selectDir('');
         }
-
-        async function createFile() {
-            const path = prompt("请输入新文件路径:");
-            if (path) {
-                await fetch(`/api/files`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path, content: '' })
-                });
-                fetchFiles();
-            }
-        }
-
-        async function saveFile() {
-            const path = filePathInput.value;
-            const content = fileContentTextarea.value;
-            await fetch(`/api/files`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path, content })
-            });
-            alert('文件已保存!');
-        }
-
-        async function deleteFile() {
-            const path = filePathInput.value;
-            if (confirm(`您确定要删除 ${path} 吗?`)) {
-                await fetch(`/api/files/${encodeURIComponent(path)}`, { method: 'DELETE' });
-                filePathInput.value = '';
-                fileContentTextarea.value = '';
-                fetchFiles();
-            }
-        }
-
-        fetchFiles();
+        fetchAll();
     </script>
 </body>
 </html>
