@@ -315,12 +315,29 @@ async def stop_mcp_service():
 # 设置模板目录
 templates = Jinja2Templates(directory="templates")
 
+# 通过 FastAPI 代理到本地 FastMCP（统一端口）
+MCP_TARGET = "http://127.0.0.1:8000/mcp"
+
+@app.api_route("/mcp{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+async def mcp_proxy(full_path: str, request: Request):
+    import requests
+    method = request.method
+    target_url = f"{MCP_TARGET}{full_path}"
+    # 复制请求头，移除 Host/Content-Length，由 requests 自动处理
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in ["host", "content-length"]}
+    body = await request.body()
+    def do_req():
+        return requests.request(method, target_url, headers=headers, data=body)
+    resp = await asyncio.to_thread(do_req)
+    # 返回原始响应内容与状态码（简单代理）
+    return Response(content=resp.content, status_code=resp.status_code, headers={k: v for k, v in resp.headers.items()})
+
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
     """处理根路径的 GET 请求，返回主页。"""
     mcp = {
         "name": "MCP 文件服务",
-        "url": "http://127.0.0.1:8000/mcp",
+        "url": "http://127.0.0.1:8888/mcp",
         "tools": ["list_files", "read_file", "write_file", "delete_path", "run_command"],
     }
     return templates.TemplateResponse("index.html", {"request": request, "mcp": mcp})
@@ -371,12 +388,12 @@ async def monitor(request: Request):
     """处理 /monitor 的 GET 请求，返回监控页面。"""
     return templates.TemplateResponse("monitor.html", {"request": request, "status": mcp_status})
 
-@app.get("/mcp", response_class=HTMLResponse)
+@app.get("/mcp-info", response_class=HTMLResponse)
 async def mcp_info(request: Request):
-    """MCP 服务介绍页面"""
+    """MCP 服务介绍页面（说明与指南）"""
     mcp = {
         "name": "MCP 文件服务",
-        "url": "http://127.0.0.1:8000/mcp",
+        "url": "http://127.0.0.1:8888/mcp",
         "tools": ["list_files", "read_file", "write_file", "delete_path", "run_command"],
     }
     return templates.TemplateResponse("mcp.html", {"request": request, "mcp": mcp})

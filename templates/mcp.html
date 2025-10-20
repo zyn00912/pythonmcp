@@ -36,7 +36,7 @@
                 <li>使用 CLI：<kbd>fastmcp run mcp_server.py</kbd></li>
                 <li>直接运行脚本：<kbd>python mcp_server.py</kbd></li>
             </ul>
-            <p>默认启动后可通过 <code>http://127.0.0.1:8000/mcp</code> 访问。</p>
+            <p>默认启动后可通过 <code>http://127.0.0.1:8888/mcp</code> 访问。</p>
         </div>
         <div class="card">
             <h2>客户端集成示例</h2>
@@ -45,7 +45,7 @@
   "mcpServers": {
     "file_mcp_server": {
       "command": "mcp-proxy",
-      "args": ["http://127.0.0.1:8000/mcp"],
+      "args": ["http://127.0.0.1:8888/mcp"],
       "description": "通过代理连接到 FastMCP 服务"
     }
   }
