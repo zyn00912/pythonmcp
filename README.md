@@ -131,3 +131,40 @@
   }
   ```
 - 或直接使用 `fastmcp run mcp_server.py` 的本地进程连接方式，具体以客户端支持为准。
+
+## 自动启动 MCP 服务
+
+- 当启动 FastAPI（`uvicorn main:app --host 127.0.0.1 --port 8888`）时，主进程会在启动钩子中检测 `127.0.0.1:8000` 端口是否空闲：
+  - 若空闲：自动启动 `mcp_server.py`（FastMCP 服务），作为子进程常驻。
+  - 若已占用：认为 MCP 已运行，跳过自动启动，避免重复。
+- 关闭 FastAPI 时会尝试终止该子进程（若是本进程启动的）。
+- 注意：如果你希望固定使用其他端口或独立运行，可手动启动 FastMCP 并更新下方 TRAE 配置中的地址。
+
+## 在 TRAE 中配置 MCP（JSON）
+
+- 方式一：通过 `mcp-proxy` 连接到本地 HTTP MCP 端点（推荐，前端界面与 HTTP 服务解耦）
+  ```json
+  {
+    "mcpServers": {
+      "file_mcp_server": {
+        "command": "mcp-proxy",
+        "args": ["http://127.0.0.1:8000/mcp"],
+        "description": "连接到本地 FastMCP 服务"
+      }
+    }
+  }
+  ```
+- 方式二：直接以本地进程方式运行（TRAE 拉起 Python 脚本；适用于不暴露 HTTP 的场景）
+  ```json
+  {
+    "mcpServers": {
+      "file_mcp_server": {
+        "command": "python",
+        "args": ["D:/mcp_server/fastapi_mcp/mcp_server.py"],
+        "env": {},
+        "description": "直接运行本地 FastMCP 服务器脚本"
+      }
+    }
+  }
+  ```
+- 将以上 JSON 放入 TRAE 的 MCP 配置区域或全局设置文件（具体路径以 TRAE 版本为准）。若你的 MCP 服务地址或端口不同，请同步调整 `args` 中的 URL 或脚本路径。

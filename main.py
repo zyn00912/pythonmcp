@@ -11,6 +11,8 @@ from pygls.server import LanguageServer
 from typing import List, Any, Dict
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+import subprocess
+import socket
 
 # --- MCP 服务器设置 ---
 # 创建一个 LanguageServer 实例，用于处理 MCP 请求
@@ -277,6 +279,38 @@ async def reboot_server_handler(params: Any) -> Dict[str, Any]:
 # --- FastAPI 应用 ---
 # 创建一个 FastAPI 实例
 app = FastAPI()
+
+# MCP 自动启动进程句柄
+mcp_proc = None
+
+# 检查端口占用（用于避免重复启动）
+def is_port_in_use(host: str = "127.0.0.1", port: int = 8000) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, port)) == 0
+
+@app.on_event("startup")
+async def start_mcp_service():
+    global mcp_proc
+    # 如果 8000 端口未被占用，则自动启动本地 MCP 服务
+    if not is_port_in_use("127.0.0.1", 8000):
+        try:
+            mcp_proc = subprocess.Popen([
+                sys.executable,
+                os.path.join(os.path.dirname(__file__), "mcp_server.py")
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            # 启动失败不影响主服务运行，可在 /monitor 页面查看状态
+            mcp_proc = None
+
+@app.on_event("shutdown")
+async def stop_mcp_service():
+    global mcp_proc
+    if mcp_proc and mcp_proc.poll() is None:
+        try:
+            mcp_proc.terminate()
+        except Exception:
+            pass
 
 # 设置模板目录
 templates = Jinja2Templates(directory="templates")
